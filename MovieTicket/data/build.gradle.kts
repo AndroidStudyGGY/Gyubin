@@ -47,6 +47,7 @@ dependencies {
     implementation(libs.retrofit.kotlin.serialization)
 
     implementation(libs.kotlinx.serialization.json)
+    implementation(libs.kotlinx.datetime)
 
     implementation(libs.hilt.android)
     kapt(libs.hilt.compiler)

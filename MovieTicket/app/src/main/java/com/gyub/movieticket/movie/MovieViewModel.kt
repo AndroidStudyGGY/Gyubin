@@ -5,12 +5,16 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.paging.PagingData
 import androidx.paging.cachedIn
+import androidx.paging.map
 import com.gyub.domain.model.MovieModel
 import com.gyub.domain.usecase.GetMoviesUseCase
+import com.gyub.movieticket.movie.model.MovieUiModel
+import com.gyub.movieticket.movie.model.toUiModel
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -24,16 +28,14 @@ import javax.inject.Inject
 class MovieViewModel @Inject constructor(
     getMoviesUseCase: GetMoviesUseCase,
 ) : ViewModel() {
-    private val _movies = MutableStateFlow<PagingData<MovieModel>>(PagingData.empty())
+    private val _movies = MutableStateFlow<PagingData<MovieUiModel>>(PagingData.empty())
     val movies = _movies.asStateFlow()
 
     init {
         viewModelScope.launch {
             getMoviesUseCase()
                 .cachedIn(viewModelScope)
-                .catch {
-                    Log.d("TAG", " - :에러에러에러에러 ")
-                }
+                .map { pagingData -> pagingData.map(MovieModel::toUiModel) }
                 .collect {
                     _movies.value = it
                 }

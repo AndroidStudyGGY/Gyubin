@@ -9,6 +9,7 @@ package com.gyub.movieticket.movie.model
 data class ReservationResultInfoUiModel(
     val movieName: String = "",
     val movieGenre: String = "",
-    val reservedCount: Int = 0,
-    val totalPrice: Int = 0,
+    val date: String = "",
+    val reservedCount: Int = 1,
+    val totalPrice: Int = 7000,
 )

@@ -24,9 +24,9 @@ data class MovieListResponse(
     data class MovieItemResponse(
         @SerialName("movieCd") val code: String,
         @SerialName("movieNm") val movieName: String,
-        @SerialName("movieNmEn") val englishName: String? = null,
+        @SerialName("movieNmEn") val englishName: String,
         @SerialName("prdtYear") val productionYear: String,
-        @SerialName("openDt") val openDate: String? = null,
+        @SerialName("openDt") val openDate: String,
         @SerialName("typeNm") val type: String,
         @SerialName("prdtStatNm") val productionStatus: String,
         @SerialName("nationAlt") val nationList: String,

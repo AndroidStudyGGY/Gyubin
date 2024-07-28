@@ -17,8 +17,8 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.paging.compose.LazyPagingItems
 import androidx.paging.compose.collectAsLazyPagingItems
-import com.gyub.domain.model.MovieModel
 import com.gyub.movieticket.movie.MovieViewModel
+import com.gyub.movieticket.movie.model.MovieUiModel
 
 /**
  *
@@ -41,7 +41,7 @@ fun MovieRoute(
 
 @Composable
 fun MovieContent(
-    movies: LazyPagingItems<MovieModel>,
+    movies: LazyPagingItems<MovieUiModel>,
     onMovieClick: (String) -> Unit,
 ) {
     MovieList(
@@ -53,7 +53,7 @@ fun MovieContent(
 @Composable
 fun MovieList(
     modifier: Modifier = Modifier,
-    movies: LazyPagingItems<MovieModel>,
+    movies: LazyPagingItems<MovieUiModel>,
     onMovieClick: (String) -> Unit,
 ) {
     LazyColumn(
@@ -72,12 +72,13 @@ fun MovieList(
 
 @Composable
 fun MovieItem(
-    movie: MovieModel,
+    movie: MovieUiModel,
     onMovieClick: (String) -> Unit,
 ) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
+            .padding(top = 10.dp)
     ) {
         Text(
             text = "영화 이름: ${movie.movieName}",
@@ -88,19 +89,28 @@ fun MovieItem(
             text = "장르 ${movie.genreName}",
             fontSize = 15.sp
         )
-        Button(onClick = { onMovieClick(movie.code) }) {
-            Text(text = "예매")
+        Text(
+            text = if (movie.isAvailableScreening) "개봉" else "상영 불가",
+            fontSize = 15.sp
+        )
+        if (movie.isAvailableScreening) {
+            Button(onClick = { onMovieClick(movie.code) }) {
+                Text(text = "예매")
+            }
         }
+
     }
 }
 
 @Preview(showBackground = true)
 @Composable
 fun MovieItemPreview() {
-    val movie = MovieModel(
+    val movie = MovieUiModel(
         code = "12123",
         movieName = "데드풀과 울버린",
-        genreName = "액션"
+        genreName = "액션",
+        isAvailableScreening = false,
+        price = 3650
     )
     MovieItem(
         movie = movie,

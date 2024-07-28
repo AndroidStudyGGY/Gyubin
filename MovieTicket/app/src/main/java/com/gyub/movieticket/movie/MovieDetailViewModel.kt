@@ -48,15 +48,28 @@ class MovieDetailViewModel @Inject constructor(
 
     fun increaseReservationCount() {
         _reservationInfoUiState.update { state ->
-            val newCount = state.reservationCount + 1
-            state.copy(reservationCount = newCount, totalPrice = newCount * getCurrentMoviePrice())
+            val currentCount = state.reservationCount
+
+            val newCount = if (currentCount == 100) currentCount else currentCount + 1
+            state.copy(reservationCount = newCount, totalPrice = newCount * getCurrentMoviePrice(state.date))
         }
     }
 
     fun decreaseReservationCount() {
         _reservationInfoUiState.update { state ->
-            val newCount = state.reservationCount - 1
-            state.copy(reservationCount = newCount, totalPrice = newCount * getCurrentMoviePrice())
+            val currentCount = state.reservationCount
+
+            val newCount = if (currentCount == 1) currentCount else currentCount - 1
+            state.copy(reservationCount = newCount, totalPrice = newCount * getCurrentMoviePrice(state.date))
+        }
+    }
+
+    fun setReservationDate(date: String) {
+        _reservationInfoUiState.update { state ->
+            state.copy(
+                date = date,
+                totalPrice = state.reservationCount * getCurrentMoviePrice(date)
+            )
         }
     }
 
@@ -87,13 +100,32 @@ class MovieDetailViewModel @Inject constructor(
     fun resetReservationResult() {
         _reservationResultUiState.value = ReservationResultUiState.Idle
     }
-
-    private fun getCurrentMoviePrice(): Int {
+    private fun getCurrentMoviePrice(date: String): Int {
         val currentState = _movieInfoUiState.value
         if (currentState !is MovieDetailUiState.Success) {
             return 0
         }
 
-        return currentState.movieInfo.price
+        var price = currentState.movieInfo.price
+
+        // 날짜와 시간을 추출
+        val dateTimePattern = Regex("""(\d{4})년 (\d{1,2})월 (\d{1,2})일 (\d{1,2})시 (\d{1,2})분""")
+        val matchResult = dateTimePattern.matchEntire(date)
+        val (year, month, day, hour, minute) = matchResult?.destructured ?: return price
+
+        val dayOfMonth = day.toInt()
+        val selectedHour = hour.toInt()
+
+        // 무비데이 할인
+        if (dayOfMonth == 10 || dayOfMonth == 20 || dayOfMonth == 30) {
+            price = (price * 0.9).toInt()
+        }
+
+        // 조조/야간 할인
+        if (selectedHour < 11 || selectedHour >= 20) {
+            price -= 2000
+        }
+
+        return price
     }
 }

@@ -30,7 +30,7 @@ class MovieRepositoryImpl @Inject constructor(
     override fun getMovies(): Flow<PagingData<MovieModel>> {
         return Pager(
             config = PagingConfig(
-                pageSize = 10,
+                pageSize = 20,
                 enablePlaceholders = false,
             ),
             pagingSourceFactory = { moviesPagingSource }

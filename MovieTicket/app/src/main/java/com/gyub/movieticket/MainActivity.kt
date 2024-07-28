@@ -33,6 +33,7 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     topBar = { TopBar(navigator) }
                 ) { innerPadding ->
+
                     MainNavHost(
                         navigator = navigator,
                         padding = innerPadding

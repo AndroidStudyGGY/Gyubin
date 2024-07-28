@@ -7,6 +7,8 @@ package com.gyub.movieticket.movie.model
  * @created  2024/07/27
  */
 data class ReservationInfoUiState(
-    val reservationCount: Int = 0,
-    val totalPrice: Int = 0,
+    val date: String = "",
+    val selectedTime: Int = 0,
+    val reservationCount: Int = 1,
+    val totalPrice: Int = 7000,
 )
