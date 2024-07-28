@@ -10,6 +10,5 @@ sealed interface MovieDetailUiState {
     data object Loading : MovieDetailUiState
     data class Success(
         val movieInfo: MovieDetailUiModel,
-        val reservationCount: Int,
     ) : MovieDetailUiState
 }

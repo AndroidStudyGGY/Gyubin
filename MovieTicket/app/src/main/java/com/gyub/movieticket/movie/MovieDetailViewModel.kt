@@ -4,9 +4,10 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.gyub.domain.usecase.GetMovieDetailUseCase
 import com.gyub.movieticket.movie.model.MovieDetailUiState
-import com.gyub.movieticket.movie.model.ReservationInfoUiState
+import com.gyub.movieticket.movie.model.ReservationDetailUiModel
 import com.gyub.movieticket.movie.model.ReservationResultInfoUiModel
-import com.gyub.movieticket.movie.model.ReservationResultUiState
+import com.gyub.movieticket.movie.model.ReservationUiState
+import com.gyub.movieticket.movie.model.SeatUiModel
 import com.gyub.movieticket.movie.model.toMovieInfoUiModel
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.delay
@@ -29,11 +30,11 @@ class MovieDetailViewModel @Inject constructor(
     private val _movieInfoUiState = MutableStateFlow<MovieDetailUiState>(MovieDetailUiState.Loading)
     val movieInfoUiState = _movieInfoUiState.asStateFlow()
 
-    private val _reservationInfoUiState = MutableStateFlow(ReservationInfoUiState())
-    val reservationInfoUiState = _reservationInfoUiState.asStateFlow()
+    private val _reservationDetailUiModel = MutableStateFlow(ReservationDetailUiModel())
+    val reservationInfoUiModel = _reservationDetailUiModel.asStateFlow()
 
-    private val _reservationResultUiState = MutableStateFlow<ReservationResultUiState>(ReservationResultUiState.Idle)
-    val reservationResultUiState = _reservationResultUiState.asStateFlow()
+    private val _reservationUiState = MutableStateFlow<ReservationUiState>(ReservationUiState.Idle)
+    val reservationResultUiState = _reservationUiState.asStateFlow()
 
     fun fetchMovieInfo(movieCode: String) {
         viewModelScope.launch {
@@ -41,91 +42,115 @@ class MovieDetailViewModel @Inject constructor(
 
             _movieInfoUiState.value = MovieDetailUiState.Success(
                 movieInfo.toMovieInfoUiModel(),
-                0
             )
         }
     }
 
     fun increaseReservationCount() {
-        _reservationInfoUiState.update { state ->
+        _reservationDetailUiModel.update { state ->
             val currentCount = state.reservationCount
 
             val newCount = if (currentCount == 100) currentCount else currentCount + 1
-            state.copy(reservationCount = newCount, totalPrice = newCount * getCurrentMoviePrice(state.date))
+            state.copy(reservationCount = newCount)
         }
     }
 
     fun decreaseReservationCount() {
-        _reservationInfoUiState.update { state ->
+        _reservationDetailUiModel.update { state ->
             val currentCount = state.reservationCount
 
             val newCount = if (currentCount == 1) currentCount else currentCount - 1
-            state.copy(reservationCount = newCount, totalPrice = newCount * getCurrentMoviePrice(state.date))
+            state.copy(reservationCount = newCount)
         }
     }
 
-    fun setReservationDate(date: String) {
-        _reservationInfoUiState.update { state ->
+    fun onSeatClick(seat: SeatUiModel) {
+        _reservationDetailUiModel.update { state ->
             state.copy(
-                date = date,
-                totalPrice = state.reservationCount * getCurrentMoviePrice(date)
+                selectedSeats = if (state.selectedSeats.contains(seat)) {
+                    state.selectedSeats.remove(seat)
+                } else {
+                    if (state.selectedSeats.size < state.reservationCount) {
+                        state.selectedSeats.add(seat)
+                    } else {
+                        state.selectedSeats
+                    }
+                }
+
             )
         }
+
+        calcTotalPrice()
+    }
+
+    fun setReservationDate(date: String, time: String) {
+        _reservationDetailUiModel.update { state ->
+            state.copy(
+                date = date,
+                time = time
+            )
+        }
+        calcTotalPrice()
     }
 
     // 예상은 예약 api 호출하면 응답으로 예약 결과를 받아오는 것
     fun reservation() {
         viewModelScope.launch {
-            _reservationResultUiState.value = ReservationResultUiState.Loading
+            _reservationUiState.value = ReservationUiState.Loading
 
             delay(300L)
 
             val movieInfoState = movieInfoUiState.value
             if (movieInfoState !is MovieDetailUiState.Success) {
-                _reservationResultUiState.value = ReservationResultUiState.Error
+                _reservationUiState.value = ReservationUiState.Error
                 return@launch
             }
 
-            _reservationResultUiState.value = ReservationResultUiState.Success(
+            _reservationUiState.value = ReservationUiState.Success(
                 ReservationResultInfoUiModel(
                     movieName = movieInfoState.movieInfo.movieName,
                     movieGenre = movieInfoState.movieInfo.genre,
-                    reservedCount = reservationInfoUiState.value.reservationCount,
-                    totalPrice = reservationInfoUiState.value.totalPrice
+                    reservedCount = reservationInfoUiModel.value.reservationCount,
+                    totalPrice = reservationInfoUiModel.value.totalPrice
                 )
             )
         }
     }
 
-    fun resetReservationResult() {
-        _reservationResultUiState.value = ReservationResultUiState.Idle
+    private fun calcTotalPrice() {
+        _reservationDetailUiModel.update { state ->
+            val basePrice = state.selectedSeats.sumOf { it.seat.price }
+
+            val isMovieDay = isMovieDay(state.date)
+            val isEarlyOrLate = isEarlyOrLate(state.time)
+
+            val discountedPrice = if (isMovieDay) {
+                basePrice * 0.9
+            } else {
+                basePrice.toDouble()
+            }
+
+            val finalPrice = if (isEarlyOrLate) {
+                (discountedPrice - 2000 * state.selectedSeats.size).coerceAtLeast(0.0)
+            } else {
+                discountedPrice
+            }
+
+            state.copy(totalPrice = finalPrice.toInt())
+        }
     }
-    private fun getCurrentMoviePrice(date: String): Int {
-        val currentState = _movieInfoUiState.value
-        if (currentState !is MovieDetailUiState.Success) {
-            return 0
-        }
 
-        var price = currentState.movieInfo.price
+    private fun isMovieDay(date: String): Boolean {
+        val day = date.split(" ").getOrNull(2)?.removeSuffix("일")?.toIntOrNull() ?: 0
+        return day == 10 || day == 20 || day == 30
+    }
 
-        // 날짜와 시간을 추출
-        val dateTimePattern = Regex("""(\d{4})년 (\d{1,2})월 (\d{1,2})일 (\d{1,2})시 (\d{1,2})분""")
-        val matchResult = dateTimePattern.matchEntire(date)
-        val (year, month, day, hour, minute) = matchResult?.destructured ?: return price
+    private fun isEarlyOrLate(time: String): Boolean {
+        val hour = time.split(" ").getOrNull(0)?.removeSuffix("시")?.toIntOrNull() ?: 0
+        return hour < 11 || hour >= 20
+    }
 
-        val dayOfMonth = day.toInt()
-        val selectedHour = hour.toInt()
-
-        // 무비데이 할인
-        if (dayOfMonth == 10 || dayOfMonth == 20 || dayOfMonth == 30) {
-            price = (price * 0.9).toInt()
-        }
-
-        // 조조/야간 할인
-        if (selectedHour < 11 || selectedHour >= 20) {
-            price -= 2000
-        }
-
-        return price
+    fun resetReservationResult() {
+        _reservationUiState.value = ReservationUiState.Idle
     }
 }

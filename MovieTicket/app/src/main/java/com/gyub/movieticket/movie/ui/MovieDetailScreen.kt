@@ -1,20 +1,13 @@
 package com.gyub.movieticket.movie.ui
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.Button
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
@@ -26,25 +19,21 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.gyub.movieticket.movie.MovieDetailViewModel
+import com.gyub.movieticket.movie.component.Calendar
+import com.gyub.movieticket.movie.component.ReservationConfirmationDialog
+import com.gyub.movieticket.movie.component.SeatSelection
 import com.gyub.movieticket.movie.model.MovieDetailUiModel
 import com.gyub.movieticket.movie.model.MovieDetailUiState
-import com.gyub.movieticket.movie.model.ReservationInfoUiState
+import com.gyub.movieticket.movie.model.ReservationDetailUiModel
 import com.gyub.movieticket.movie.model.ReservationResultInfoUiModel
-import com.gyub.movieticket.movie.model.ReservationResultUiState
+import com.gyub.movieticket.movie.model.ReservationUiState
+import com.gyub.movieticket.movie.model.SeatUiModel
 import com.gyub.movieticket.ui.component.LoadingIndicator
-import kotlinx.datetime.Clock
-import kotlinx.datetime.DayOfWeek
-import kotlinx.datetime.TimeZone
-import kotlinx.datetime.toLocalDateTime
-import kotlinx.datetime.todayIn
-import java.time.LocalTime
-import java.time.format.DateTimeFormatter
+import kotlinx.collections.immutable.PersistentList
 
 /**
  *
@@ -60,7 +49,7 @@ fun MovieDetailRoute(
     moveReservationResult: (ReservationResultInfoUiModel) -> Unit,
 ) {
     val movieInfoUiState by viewModel.movieInfoUiState.collectAsStateWithLifecycle()
-    val reservationInfo by viewModel.reservationInfoUiState.collectAsStateWithLifecycle()
+    val reservationInfo by viewModel.reservationInfoUiModel.collectAsStateWithLifecycle()
     val reservationResultUiState by viewModel.reservationResultUiState.collectAsStateWithLifecycle()
 
     MovieDetailContent(
@@ -70,6 +59,7 @@ fun MovieDetailRoute(
         increaseReservationCount = viewModel::increaseReservationCount,
         decreaseReservationCount = viewModel::decreaseReservationCount,
         setReservationDate = viewModel::setReservationDate,
+        onSeatClick = viewModel::onSeatClick,
         reservation = viewModel::reservation,
     )
 
@@ -78,16 +68,16 @@ fun MovieDetailRoute(
     }
     LaunchedEffect(reservationResultUiState) {
         when (val reservationResult = reservationResultUiState) {
-            ReservationResultUiState.Error -> {
+            ReservationUiState.Error -> {
                 /** showErrorToast */
             }
 
-            ReservationResultUiState.Idle -> {}
-            ReservationResultUiState.Loading -> {
+            ReservationUiState.Idle -> {}
+            ReservationUiState.Loading -> {
                 /** LoadingIndicator() */
             }
 
-            is ReservationResultUiState.Success -> {
+            is ReservationUiState.Success -> {
                 moveReservationResult(reservationResult.result)
                 viewModel.resetReservationResult()
             }
@@ -99,11 +89,12 @@ fun MovieDetailRoute(
 fun MovieDetailContent(
     innerPadding: PaddingValues,
     movieInfo: MovieDetailUiState,
-    reservationInfo: ReservationInfoUiState,
+    reservationInfo: ReservationDetailUiModel,
     increaseReservationCount: () -> Unit,
     decreaseReservationCount: () -> Unit,
+    onSeatClick: (SeatUiModel) -> Unit,
+    setReservationDate: (String, String) -> Unit,
     reservation: () -> Unit,
-    setReservationDate: (String) -> Unit,
 ) {
     when (movieInfo) {
         is MovieDetailUiState.Loading -> LoadingIndicator(Modifier.fillMaxSize())
@@ -111,9 +102,11 @@ fun MovieDetailContent(
             innerPadding = innerPadding,
             movieInfo = movieInfo.movieInfo,
             reservationCount = reservationInfo.reservationCount,
+            selectedSeats = reservationInfo.selectedSeats,
             totalPrice = reservationInfo.totalPrice,
             increaseReservationCount = increaseReservationCount,
             decreaseReservationCount = decreaseReservationCount,
+            onSeatClick = onSeatClick,
             setReservationDate = setReservationDate,
             reservation = reservation
         )
@@ -125,32 +118,55 @@ fun MovieDetailScreen(
     innerPadding: PaddingValues,
     movieInfo: MovieDetailUiModel,
     reservationCount: Int,
+    selectedSeats: PersistentList<SeatUiModel>,
     totalPrice: Int,
     increaseReservationCount: () -> Unit,
     decreaseReservationCount: () -> Unit,
+    onSeatClick: (SeatUiModel) -> Unit,
+    setReservationDate: (String, String) -> Unit,
     reservation: () -> Unit,
-    setReservationDate: (String) -> Unit,
 ) {
-    Box(
+    var showDialog by remember { mutableStateOf(false) }
+    Column(
         modifier = Modifier
             .fillMaxSize()
     ) {
         MovieInfo(
-            modifier = Modifier.align(Alignment.TopCenter),
+            modifier = Modifier.weight(0.5f),
             movieInfo = movieInfo
         )
-        Calender(
-            modifier = Modifier.align(Alignment.Center),
+        Calendar(
+            modifier = Modifier.weight(2f),
             setReservationDate = setReservationDate,
         )
-        Reservation(
-            modifier = Modifier.align(Alignment.BottomCenter),
+        ReservationCount(
+            modifier = Modifier.weight(0.5f),
             reservationCount = reservationCount,
-            totalPrice = totalPrice,
             increaseReservationCount = increaseReservationCount,
-            decreaseReservationCount = decreaseReservationCount,
-            reservation = reservation,
+            decreaseReservationCount = decreaseReservationCount
         )
+        SeatSelection(
+            modifier = Modifier.weight(2f),
+            selectedSeats = selectedSeats,
+            onSeatClick = onSeatClick,
+        )
+
+        Reservation(
+            modifier = Modifier.weight(0.5f),
+            reservationCount = reservationCount,
+            selectedSeats = selectedSeats,
+            totalPrice = totalPrice,
+            showDialog = { showDialog = true }
+        )
+
+        ReservationConfirmationDialog(
+            showDialog = showDialog,
+            onDismissRequest = { showDialog = false },
+            onConfirm = reservation,
+            selectedSeats = selectedSeats,
+            totalPrice = totalPrice
+        )
+
     }
 }
 
@@ -160,10 +176,6 @@ fun MovieInfo(
     movieInfo: MovieDetailUiModel,
 ) {
     Column(modifier) {
-        Text(
-            text = movieInfo.code,
-            fontSize = 10.sp
-        )
         Text(
             text = movieInfo.movieName,
             fontSize = 20.sp
@@ -176,124 +188,49 @@ fun MovieInfo(
 }
 
 @Composable
-fun Calender(
+fun ReservationCount(
     modifier: Modifier = Modifier,
-    setReservationDate: (String) -> Unit,
+    reservationCount: Int,
+    increaseReservationCount: () -> Unit,
+    decreaseReservationCount: () -> Unit,
 ) {
-    val context = LocalContext.current
-
-    val currentDate = Clock.System.todayIn(TimeZone.currentSystemDefault())
-    val currentTime = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).time
-
-    var selectedDate by remember { mutableStateOf(currentDate) }
-    var selectedTime by remember { mutableStateOf(java.time.LocalTime.of(currentTime.hour, currentTime.minute).plusHours(1)) }
-
-    val isWeekend = selectedDate.dayOfWeek == DayOfWeek.SATURDAY || selectedDate.dayOfWeek == DayOfWeek.SUNDAY
-
-    val availableTimes = remember(selectedDate) {
-        val startHour = if (isWeekend) 9 else 10
-        val endHour = 24
-        (startHour until endHour step 2).filter { it > currentTime.hour || selectedDate > currentDate }.toList()
-    }
-
-    var expanded by remember { mutableStateOf(false) }
-
-    Column(
-        modifier = modifier
-            .fillMaxWidth(),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
-    ) {
-        Text("날짜 선택", fontSize = 20.sp)
-        Spacer(modifier = Modifier.height(8.dp))
-        Button(onClick = {
-            showDatePicker(context) { date ->
-                selectedDate = date
-            }
-        }) {
-            Text(text = selectedDate.toString())
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        Text("시간 선택", fontSize = 20.sp)
-        Spacer(modifier = Modifier.height(8.dp))
-
-        Button(onClick = { expanded = true }) {
-            Text(text = selectedTime.format(DateTimeFormatter.ofPattern("HH:mm")))
-        }
-
-        DropdownMenu(
-            modifier = Modifier.fillMaxWidth(),
-            expanded = expanded,
-            onDismissRequest = { expanded = false },
+    Row(modifier = modifier) {
+        IconButton(
+            onClick = increaseReservationCount,
+            modifier = Modifier.align(Alignment.CenterVertically)
         ) {
-            availableTimes.forEach { time ->
-                DropdownMenuItem(
-                    onClick = {
-                        selectedTime = LocalTime.of(time, 0)
-                        expanded = false
-                    },
-                    text = { Text("$time:00") }
-                )
-            }
+            Icon(imageVector = Icons.Filled.KeyboardArrowUp, contentDescription = "")
         }
 
-        Spacer(modifier = Modifier.height(16.dp))
+        Text(
+            text = "예약 인원: ${reservationCount}명",
+            modifier = Modifier.align(Alignment.CenterVertically)
+        )
 
-        Button(onClick = {
-            val formattedDate = "${selectedDate.year}년 ${selectedDate.monthNumber}월 ${selectedDate.dayOfMonth}일 ${selectedTime.hour}시 ${selectedTime.minute}분"
-            setReservationDate(formattedDate)
-        }) {
-            Text(text = "날짜 선택 완료")
+        IconButton(
+            onClick = decreaseReservationCount,
+            modifier = Modifier.align(Alignment.CenterVertically)
+        ) {
+            Icon(imageVector = Icons.Filled.KeyboardArrowDown, contentDescription = "")
         }
-
-        Spacer(modifier = Modifier.height(16.dp))
     }
-}
-
-fun showDatePicker(context: android.content.Context, onDateSelected: (kotlinx.datetime.LocalDate) -> Unit) {
-    val datePickerDialog = android.app.DatePickerDialog(context)
-    datePickerDialog.setOnDateSetListener { _, year, month, dayOfMonth ->
-        onDateSelected(kotlinx.datetime.LocalDate(year, month + 1, dayOfMonth))
-    }
-    datePickerDialog.show()
 }
 
 @Composable
 fun Reservation(
     modifier: Modifier = Modifier,
-    reservationCount: Int,
     totalPrice: Int,
-    increaseReservationCount: () -> Unit,
-    decreaseReservationCount: () -> Unit,
-    reservation: () -> Unit,
+    reservationCount: Int,
+    selectedSeats: PersistentList<SeatUiModel>,
+    showDialog: () -> Unit,
 ) {
     Column(modifier) {
-        Row {
-            IconButton(
-                onClick = increaseReservationCount,
-                modifier = Modifier.align(Alignment.CenterVertically)
-            ) {
-                Icon(imageVector = Icons.Filled.KeyboardArrowUp, contentDescription = "")
-            }
-
-            Text(
-                text = "예약 인원: ${reservationCount}명",
-                modifier = Modifier.align(Alignment.CenterVertically)
-            )
-
-            IconButton(
-                onClick = decreaseReservationCount,
-                modifier = Modifier.align(Alignment.CenterVertically)
-            ) {
-                Icon(imageVector = Icons.Filled.KeyboardArrowDown, contentDescription = "")
-            }
-        }
-
         Text(text = "총 예약금액: $totalPrice")
 
-        Button(onClick = { reservation() }) {
+        Button(
+            enabled = reservationCount == selectedSeats.size,
+            onClick = { showDialog() }
+        ) {
             Text(text = "예약하기")
         }
     }

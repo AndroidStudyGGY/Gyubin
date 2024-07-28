@@ -12,12 +12,11 @@ data class MovieDetailUiModel(
     val code: String,
     val movieName: String,
     val genre: String,
-    val price: Int,
 )
 
 fun MovieInfoModel.toMovieInfoUiModel() = MovieDetailUiModel(
     code = code,
     movieName = movieName,
     genre = genre.joinToString(" / ") { it.genreName },
-    price = price
+//    price = price
 )
